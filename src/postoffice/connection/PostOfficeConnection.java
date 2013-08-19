@@ -1,29 +1,29 @@
 package postoffice.connection;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import javax.net.SocketFactory;
 
-import postoffice.daemon.MailClerk.REQ;
-import postoffice.datatypes.Letter;
+import postoffice.connection.script.CommScript;
+import postoffice.datatypes.CommFlags.REQ;
+import postoffice.datatypes.CommFlags.RESP;
+import postoffice.datatypes.Message;
 import postoffice.exception.PostOfficeException;
+import postoffice.exception.comm.CommunicationException;
+import postoffice.exception.comm.MailTimeoutException;
 
 public class PostOfficeConnection {
 
 	private Socket s = null;
 	private OutputStream os = null;
 	private InputStream is = null;
+	private CommScript cs = null;
+	
+	private String mailboxId = null;
 	
 	private String address = null;
 	private int port;
@@ -32,6 +32,11 @@ public class PostOfficeConnection {
 		
 		this.address = address;
 		this.port = port;
+	}
+	
+	public String getMailboxId(){
+		
+		return this.mailboxId;
 	}
 	
 	public void connect() throws PostOfficeException {
@@ -43,6 +48,8 @@ public class PostOfficeConnection {
 			os = s.getOutputStream();
 			is = s.getInputStream();
 			
+			cs = new CommScript(is, os);
+			
 		} catch (IOException e) {
 			
 			throw new PostOfficeException("Problem establishing post office connection.", e);
@@ -50,6 +57,8 @@ public class PostOfficeConnection {
 	}
 	
 	public void disconnect() throws PostOfficeException{
+		
+		cs.execute(REQ.DISCONNECT, RESP.REQGRANTED);
 		
 		try {
 			
@@ -61,92 +70,92 @@ public class PostOfficeConnection {
 		}
 	}
 	
-	public Letter getMessage(){
+	public byte[] getMessage() throws MailTimeoutException {
 		
+		return getMessage(".*", 0);
 	}
 	
-	public Letter getMessage(int tamount, TimeUnit tu){
+	public byte[] getMessage(int waitTime) throws MailTimeoutException {
 		
+		return getMessage(".*", waitTime);
 	}
 	
-	public Letter getMessage(String filter){
-		
+	public byte[] getMessage(String filter) throws MailTimeoutException {
+	
+		return getMessage(filter, 0);
 	}
 	
-	public Letter getMessage(String filter, int tamount, TimeUnit tu) throws IOException{
+	public byte[] getMessage(String filter, int waitTime) {
 		
-		os.write(REQ.GETLETTER.ordinal());
+		cs.execute(REQ.GETLETTER, RESP.REQDATA);
 		
+		cs.addData(filter);
+		cs.executeWithData(RESP.REQDATA);
 		
+		cs.addData(ByteBuffer.allocate(4).putLong(waitTime).array());
+		cs.executeWithData(RESP.INCOMINGMAIL, waitTime);
+		
+		return cs.getMessage().getPayloadBytes();
 	}
 	
-	public Future<Letter> createFuture()
-	{
-	    ExecutorService service = Executors.newSingleThreadExecutor();
-	    
-	    Callable<Letter> callable = new Callable<Letter>(){
+	public void sendMessage(String recipient, Message<?> message){
 
-			@Override
-			public Letter call() throws Exception {
-				
-				s.setSoTimeout(0);
-				
-				byte[] messageData = null;
+		// The format is <RECIPIENT><EOL><LENGTH><-- PAYLOAD BYTES -->
+		
+		cs.execute(REQ.SENDLETTER, RESP.REQDATA);
+		
+		cs.addData(recipient);
+		cs.executeWithData(RESP.REQDATA);
+		
+		byte[] payload = message.marshall();
+		
+		cs.addData(ByteBuffer.allocate(4).putInt(payload.length).array());
+		cs.addData(payload);
+		
+		cs.executeWithData(RESP.REQGRANTED);
+	}
 
-				BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-				
-				String sender = br.readLine();
-				String recipient = br.readLine();
+	public void emptyMailQueue() throws CommunicationException {
 
-				// Get the payload.
-				byte[] intData = new byte[4];
-				is.read(intData);
-
-				int byteLength = ByteBuffer.allocate(4).put(intData).getInt();
-
-				if(byteLength > 0){
-
-					messageData = new byte[byteLength];
-					is.read(messageData);
-				}
-				
-				return new Letter(sender, recipient, messageData);
-			}
-	    };
-	    
-	    Future<Letter> ret = service.submit(callable);
-	    
-	    // Let the thread die when the callable has finished.
-	    service.shutdown();
-	    
-	    return ret;
+		cs.clearLetterBuffer();
+		cs.execute(REQ.EMPTYBOX, RESP.REQDATA);
 	}
 	
-	public void sendMessage(String recipient, byte[] message){
+	public void createMailbox(String identifier, String password) throws CommunicationException {
 		
-	}
-	
-	public void emptyMailQueue(){
+		cs.execute(REQ.CREATEBOX, RESP.REQDATA);
 		
-	}
-	
-	public void createMailbox(String identifier, String password){
+		cs.addData(identifier);
+		cs.executeWithData(RESP.REQDATA);
 		
-	}
-	
-	public void deleteMailbox(String identifier, String password){
-		
+		cs.addData(password);
+		cs.executeWithData(RESP.REQGRANTED);
 	}
 	
 	public void deleteMailbox(){
 		
+		cs.execute(REQ.REMOVEBOX, RESP.REQDATA);
+		
+		mailboxId = null;
 	}
 	
 	public void checkoutMailbox(String identifier, String password){
 		
+		cs.execute(REQ.REQBOX, RESP.REQDATA);
+
+		cs.addData(identifier);
+		cs.executeWithData(RESP.REQDATA);
+		
+		cs.addData(password);
+		cs.executeWithData(RESP.REQGRANTED);
+		
+		mailboxId = identifier;
 	}
 	
 	public void returnMailbox(){
 		
+		cs.execute(REQ.DISCONNECTBOX, RESP.REQDATA);
+		
+		mailboxId = null;
 	}
 }

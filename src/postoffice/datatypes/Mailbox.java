@@ -64,7 +64,7 @@ public class Mailbox {
 	 * 
 	 * @throws UnauthorizedActionException 
 	 */
-	public synchronized void emptyMailBox() throws UnauthorizedActionException{
+	public synchronized void empty() throws UnauthorizedActionException{
 
 		if(this.holdingMailbox())
 			inbox.clear();

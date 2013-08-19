@@ -11,11 +11,12 @@ import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.log4j.Logger;
 
+import postoffice.datatypes.CommFlags.REQ;
+import postoffice.datatypes.CommFlags.RESP;
+import postoffice.datatypes.CommFlags;
 import postoffice.datatypes.Letter;
 import postoffice.datatypes.Mailbox;
 import postoffice.exception.mailbox.ExistentMailboxException;
@@ -24,40 +25,6 @@ import postoffice.exception.mailbox.NonExistentMailboxException;
 import postoffice.exception.mailbox.UnauthorizedActionException;
 
 public class MailClerk implements Runnable {
-
-	public static enum REQ {
-
-		REQBOX,
-		CREATEBOX,
-		REMOVEBOX,
-		DISCONNECT,
-		SENDLETTER,
-		GETLETTER
-	}
-
-	public static enum RESP {
-
-		NOTAUTH,
-		BADCOMMAND,
-		TIMEOUT,
-		BOXREMOVED,
-		BOXEXISTS,
-		NONEXISTENTBOX,
-		NOBOXCONNECTION,
-		BOXINUSE,
-		DELIVERED,
-		DELIVERYFAILURE,
-		NOSUCHBOX,
-		SHUTDOWN,
-		GOODBYE,
-		BOXCONNECTED,
-		REQDATA,
-		REQGRANTED,
-		NOMAIL,
-		INCOMINGMAIL
-	}
-	
-	public static final int END_OF_LINE = 0xA;
 	
 	private MessageDigest md = null;
 	
@@ -66,16 +33,6 @@ public class MailClerk implements Runnable {
 	private Socket s;
 	private PostOffice po;
 	private Mailbox mb = null;
-	
-	private static Map<Integer, REQ> reqLookup;
-	
-	static {
-		
-		reqLookup = new HashMap<Integer, REQ>();
-		
-		for(REQ inst : REQ.values())
-			reqLookup.put(inst.ordinal(), inst);
-	}
 	
 	public MailClerk(Socket s, PostOffice po){
 
@@ -112,7 +69,7 @@ public class MailClerk implements Runnable {
 				s.setSoTimeout(0);
 				
 				int command = is.read();
-				request = reqLookup.get(command);
+				request = CommFlags.getReqByCode(command);
 				
 				if(request == null){
 					
@@ -153,10 +110,19 @@ public class MailClerk implements Runnable {
 
 							} catch (NonExistentMailboxException e) {
 
-								os.write(RESP.NOSUCHBOX.ordinal());
+								os.write(RESP.NONEXISTENTBOX.ordinal());
 								continue;
 							}
 							
+							break;
+							
+						case DISCONNECTBOX:
+							
+							if(mb == null){
+								
+								os.write(RESP.NOBOXCONNECTION.ordinal());
+								continue;
+							}
 							break;
 							
 						case CREATEBOX:
@@ -176,14 +142,15 @@ public class MailClerk implements Runnable {
 								continue;
 							}
 							
-							os.write(RESP.REQGRANTED.ordinal());
-							
 							break;
 							
 						case REMOVEBOX:
 							
-							os.write(RESP.REQDATA.ordinal());
-							boxname = br.readLine();
+							if(mb == null){
+								
+								os.write(RESP.NOBOXCONNECTION.ordinal());
+								continue;
+							}
 
 							try {
 								
@@ -195,16 +162,14 @@ public class MailClerk implements Runnable {
 								continue;
 							}
 							
-							os.write(RESP.REQGRANTED.ordinal());
-							
 							break;
 							
 						case DISCONNECT:
-
-							os.write(RESP.GOODBYE.ordinal());
 							
 							if(mb != null)
 								mb.release();
+							
+							os.write(RESP.REQGRANTED.ordinal());
 							
 							s.close();
 							
@@ -224,11 +189,11 @@ public class MailClerk implements Runnable {
 							try {
 								
 								po.sendLetter(letter);
-								os.write(RESP.DELIVERED.ordinal());
 								
 							} catch (NonExistentMailboxException e) {
 								
 								os.write(RESP.DELIVERYFAILURE.ordinal());
+								continue;
 							}
 							
 							break;
@@ -253,17 +218,31 @@ public class MailClerk implements Runnable {
 							pushToSocket(mb.popMessage());
 							
 							break;
+							
+						case EMPTYBOX:
+							
+							if(mb == null){
+								
+								os.write(RESP.NOBOXCONNECTION.ordinal());
+								continue;
+							}
+							
+							mb.empty();
+							
+							break;
 					}
+					
+					os.write(RESP.REQGRANTED.ordinal());
 				
 				} catch(SocketTimeoutException ste){
 
 					logger.debug("Client took too long to respond to command '" + request.name() + "'.");
-					os.write(RESP.TIMEOUT.ordinal());
+					os.write(RESP.COMMTIMEOUT.ordinal());
 					continue;
 					
 				} catch (UnauthorizedActionException uae) {
 					
-					os.write(RESP.NOTAUTH.ordinal());
+					os.write(RESP.NOAUTH.ordinal());
 				}
 			}
 			
@@ -282,6 +261,7 @@ public class MailClerk implements Runnable {
 				logger.debug("Attempting to close the socket.");
 				
 				s.close();
+				
 			} catch (IOException ioe) {
 
 				logger.debug("Failed to close the socket. Tossing instead. Cause : "
@@ -323,18 +303,15 @@ public class MailClerk implements Runnable {
 		OutputStream os = this.s.getOutputStream();
 
 		os.write(letter.getSender().getBytes("UTF-8"));
-		os.write(END_OF_LINE);
-
-		os.write(letter.getRecipient().getBytes("UTF-8"));
-		os.write(END_OF_LINE);
-
+		os.write(CommFlags.END_OF_LINE);
+		
 		byte[] payload = letter.getPayloadBytes();
 
 		os.write(ByteBuffer.allocate(4).putInt(payload.length).array());
 		os.write(payload);
 	}
 
-	private Letter receiveLetter(InputStream is) throws IOException{
+	private Letter receiveLetter(InputStream is) throws IOException {
 
 		// The format is <RECIPIENT><EOL><LENGTH><-- PAYLOAD BYTES -->
 		
