@@ -1,8 +1,21 @@
 package postoffice.datatypes;
 
-public interface Message<T extends Message<T>> {
+public abstract class Message {
 
-	public byte[] marshall();
+	private	String sender;
 	
-	public T demarshall();
+	public void initialize(String sender, byte[] data){
+		
+		this.sender = sender;
+		demarshal(data);
+	}
+
+	public final String getSender(){
+		
+		return sender;
+	}
+	
+	public abstract void demarshal(byte[] data);
+	
+	public abstract byte[] marshal();
 }

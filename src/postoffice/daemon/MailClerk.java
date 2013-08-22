@@ -89,7 +89,7 @@ public class MailClerk implements Runnable {
 							
 							if(mb != null){
 								
-								os.write(RESP.BOXCONNECTED.ordinal());
+								os.write(RESP.ALREADYCONNECTED.ordinal());
 								continue;
 							}
 							else
