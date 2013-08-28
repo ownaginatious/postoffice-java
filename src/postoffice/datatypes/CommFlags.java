@@ -10,7 +10,9 @@ public class CommFlags {
 		REMOVEBOX,
 		DISCONNECT,
 		SENDLETTER,
-		GETLETTER,
+		GETMAIL,
+		NEXTLETTER,
+		SATIATED,
 		EMPTYBOX
 	}
 

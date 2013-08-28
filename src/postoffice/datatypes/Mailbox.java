@@ -25,12 +25,12 @@ public class Mailbox {
 		this.passwordHash = passwordHash;
 	}
 
-	public synchronized Letter popMessage(){
+	public Letter popMessage(){
 	
 		return inbox.poll();
 	}
 	
-	public synchronized Letter popMessage(long timeout, TimeUnit tu){
+	public Letter popMessage(long timeout, TimeUnit tu){
 		
 		try {
 			return inbox.poll(timeout, tu);
@@ -54,7 +54,7 @@ public class Mailbox {
 	 * 
 	 * @param letter The letter to put in the message queue.
 	 */
-	public synchronized void deliver(Letter letter){
+	public void deliver(Letter letter){
 
 		inbox.add(letter);
 	}
@@ -64,7 +64,7 @@ public class Mailbox {
 	 * 
 	 * @throws UnauthorizedActionException 
 	 */
-	public synchronized void empty() throws UnauthorizedActionException{
+	public void empty() throws UnauthorizedActionException{
 
 		if(this.holdingMailbox())
 			inbox.clear();

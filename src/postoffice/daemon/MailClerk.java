@@ -5,12 +5,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -26,39 +24,34 @@ import postoffice.exception.mailbox.UnauthorizedActionException;
 
 public class MailClerk implements Runnable {
 	
-	private MessageDigest md = null;
-	
 	private static Logger logger = Logger.getLogger(MailClerk.class);
 	
 	private Socket s;
 	private PostOffice po;
 	private Mailbox mb = null;
 	
+	private InputStream is = null;
+	private OutputStream os = null;
+	private BufferedReader br = null;
+	
 	public MailClerk(Socket s, PostOffice po){
 
 		this.s = s;
 		this.po = po;
-		
-		// Initialize the password digester.
-		try {
-			md = MessageDigest.getInstance("MD5");
-		} catch (NoSuchAlgorithmException e) {} // This will not ever happen, so who cares.
 	}
 
 	@Override
 	public void run() {
-
-		InputStream is;
-		OutputStream os;
 		
 		REQ request = null;
+		Letter letter = null;
 		
 		try {
 			
 			is = s.getInputStream();
 			os = s.getOutputStream();
 			
-			BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+			br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
 			
 			String boxname = null;
 			byte[] passwordHash = null;
@@ -68,12 +61,11 @@ public class MailClerk implements Runnable {
 				
 				s.setSoTimeout(0);
 				
-				int command = is.read();
-				request = CommFlags.getReqByCode(command);
+				request = readRequest();
 				
 				if(request == null){
 					
-					logger.debug("Received bad command '" + command + "'.");
+					logger.debug("Received bad command.");
 					os.write(RESP.BADCOMMAND.ordinal());
 					continue;
 				}
@@ -97,7 +89,7 @@ public class MailClerk implements Runnable {
 							
 							boxname = br.readLine();
 							os.write(RESP.REQDATA.ordinal());
-							passwordHash = md5Hash(br.readLine());
+							passwordHash = br.readLine().getBytes("UTF-8");
 								
 							try {
 
@@ -130,7 +122,7 @@ public class MailClerk implements Runnable {
 							os.write(RESP.REQDATA.ordinal());
 							boxname = br.readLine();
 							os.write(RESP.REQDATA.ordinal());
-							passwordHash = md5Hash(br.readLine());
+							passwordHash = br.readLine().getBytes();
 
 							try {
 								
@@ -184,7 +176,7 @@ public class MailClerk implements Runnable {
 							}
 							
 							os.write(RESP.REQDATA.ordinal());
-							Letter letter = receiveLetter(is);
+							letter = receiveLetter(is);
 								
 							try {
 								
@@ -198,7 +190,7 @@ public class MailClerk implements Runnable {
 							
 							break;
 							
-						case GETLETTER:
+						case GETMAIL:
 							
 							if(mb == null){
 								
@@ -206,16 +198,40 @@ public class MailClerk implements Runnable {
 								continue;
 							}
 							
-							if(mb.getQueueSize() == 0){
+							// Get the timeout length (milliseconds).
+							byte[] lengthBytes = new byte[4];
+							is.read(lengthBytes);
+							
+							int timeout = ByteBuffer.allocate(4).put(lengthBytes).getInt();
 
-								os.write(RESP.NOMAIL.ordinal());
+							long timeRemaining = 1000000 * timeout;
+							long maxTime = System.nanoTime() + timeRemaining;
+							
+							while(timeRemaining > 0 || timeout == 0 & mb.getQueueSize() > 0){
+							
+								request = readRequest();
+								
+								if(request == REQ.NEXTLETTER){
+									
+									letter = mb.popMessage(timeRemaining, TimeUnit.NANOSECONDS);
+									
+									if(letter != null){
+									
+										os.write(RESP.INCOMINGMAIL.ordinal());
+										pushToSocket(letter);
+									}
+								}
+								else if(request == REQ.SATIATED)
+									break;
+								
+								timeRemaining = maxTime - System.nanoTime();
+							}
+							
+							if(request != REQ.SATIATED){
+								
+								os.write(RESP.MAILTIMEOUT.ordinal());
 								continue;
 							}
-							else
-								os.write(RESP.INCOMINGMAIL.ordinal());
-							
-							
-							pushToSocket(mb.popMessage());
 							
 							break;
 							
@@ -230,6 +246,12 @@ public class MailClerk implements Runnable {
 							mb.empty();
 							
 							break;
+							
+						default:
+							
+							logger.debug("Received non-initiating command '" + request.name() + "'.");
+							os.write(RESP.BADCOMMAND.ordinal());
+							continue;
 					}
 					
 					os.write(RESP.REQGRANTED.ordinal());
@@ -279,18 +301,12 @@ public class MailClerk implements Runnable {
 			return;
 		}
 	}
-	
-	private byte[] md5Hash(String password){
-		
-		md.reset();
-		
-		try {
-			return md.digest(password.getBytes("UTF-8"));
-		} catch (UnsupportedEncodingException e) {} // This won't ever happen, so who cares.
-		
-		return null;
-	}
 
+	private REQ readRequest() throws IOException{
+		
+		return CommFlags.getReqByCode(is.read());
+	}
+	
 	/**
 	 * Pushes an incoming message directly to the receiver through their socket connection to
 	 * the current mailbox.
