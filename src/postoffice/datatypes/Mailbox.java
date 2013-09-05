@@ -1,5 +1,6 @@
 package postoffice.datatypes;
 
+import java.util.Arrays;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -28,6 +29,15 @@ public class Mailbox {
 	public Letter popMessage(){
 	
 		return inbox.poll();
+	}
+	
+	public Letter peekMessage(long timeout, TimeUnit tu){
+		
+		try {
+			return inbox.poll(timeout, tu);
+		} catch (InterruptedException e) {
+			return null;
+		}
 	}
 	
 	public Letter popMessage(long timeout, TimeUnit tu){
@@ -75,7 +85,7 @@ public class Mailbox {
 
 	public void checkout(byte[] passwordHash) throws UnauthorizedActionException, MailboxInUseException {
 
-		if(!this.passwordHash.equals(passwordHash))
+		if(!Arrays.equals(this.passwordHash, passwordHash))
 			throw new UnauthorizedActionException("Bad credentials to mailbox '" + this.owner + "'.");
 
 		if(checkoutLock.tryLock())

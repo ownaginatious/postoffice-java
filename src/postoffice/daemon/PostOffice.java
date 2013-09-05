@@ -3,6 +3,7 @@ package postoffice.daemon;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.SocketException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -26,19 +27,31 @@ public class PostOffice implements Runnable {
 
 	private Map<String, Mailbox> mailboxes = new ConcurrentHashMap<String, Mailbox>();
 
-	private int port = 8228;
-
 	private boolean running = true;
 	
 	private ServerSocket ss = null;
 	
-	public PostOffice(int port){
-
-		this.port = port;
+	public static PostOffice createPostOffice() throws IOException {
+		
+		return PostOffice.createPostOffice(DEFAULT_PORT);
+	}
+	
+	public static PostOffice createPostOffice(int port) throws IOException {
+		
+		PostOffice postOffice = new PostOffice(port);
+		
+		(new Thread(postOffice)).start();
+		
+		return postOffice;
 	}
 
-	public PostOffice(){}
-
+	private PostOffice(int port) throws IOException {
+		
+		ss = new ServerSocket(port);
+		logger.debug("Daemon started on port " + port + ".");
+		
+	}
+	
 	/**
 	 * Checks if a mailbox has been checked out or not.
 	 * 
@@ -70,7 +83,7 @@ public class PostOffice implements Runnable {
 		if(currentBox != null)
 			throw new ExistentMailboxException("Cannot create the mailbox with identifier '" + id + "' as it already exists.");
 
-		mailboxes.put(id, new Mailbox(id, passwordHash));
+		mailboxes.put(id, new Mailbox(id, Arrays.copyOf(passwordHash, passwordHash.length)));
 	}
 
 	/**
@@ -122,7 +135,7 @@ public class PostOffice implements Runnable {
 		
 		currentBox.checkout(passwordHash);
 		
-		return null;
+		return currentBox;
 	}
 
 	/**
@@ -182,15 +195,7 @@ public class PostOffice implements Runnable {
 	public void run() {
 
 		ExecutorService executor = Executors.newCachedThreadPool();
-
-		try {
-			ss = new ServerSocket(port);
-		} 
-		catch (IOException e) {
-			//throw new PostOfficeException("Unable to start a daemon socket.", e);
-			return;
-		}
-
+		
 		while(running){
 
 			long connId = 0;
@@ -207,7 +212,7 @@ public class PostOffice implements Runnable {
 				// This exception is only thrown when the server's socket is
 				// terminated.
 
-				logger.info("");
+				logger.info(e.getMessage());
 
 			} catch (IOException e) {
 
@@ -215,10 +220,8 @@ public class PostOffice implements Runnable {
 				logger.debug(e.getStackTrace());
 
 			}
-			finally {
-
-				executor.shutdown();
-			}
 		}
+		
+		executor.shutdown();
 	}
 }

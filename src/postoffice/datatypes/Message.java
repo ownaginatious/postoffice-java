@@ -4,7 +4,7 @@ public abstract class Message {
 
 	private	String sender;
 	
-	public void initialize(String sender, byte[] data){
+	public final void initialize(String sender, byte[] data){
 		
 		this.sender = sender;
 		demarshal(data);
