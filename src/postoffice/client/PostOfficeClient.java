@@ -1,4 +1,4 @@
-package postoffice.connection;
+package postoffice.client;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -34,7 +34,7 @@ import postoffice.exception.mailbox.NoMailException;
 import postoffice.exception.mailbox.NonExistentMailboxException;
 import postoffice.exception.mailbox.UnauthorizedActionException;
 
-public class PostOfficeConnection<T extends Message> {
+public class PostOfficeClient<T extends Message> {
 
 	private MessageDigest md = null;
 	private Socket s = null;
@@ -50,7 +50,7 @@ public class PostOfficeConnection<T extends Message> {
 	
 	private Map<String, Queue<T>> mailBuffer = new HashMap<String, Queue<T>>();
 	
-	public PostOfficeConnection(Class<T> messageClass){
+	public PostOfficeClient(Class<T> messageClass){
 
 		this.messageClass = messageClass;
 		

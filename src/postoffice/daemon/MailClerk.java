@@ -331,6 +331,44 @@ public class MailClerk implements Runnable {
 							
 							break;
 							
+						case LIVESTREAM:
+							
+							if(mb == null){
+
+								log(Level.DEBUG, "No mailbox connection.");
+								os.writeByte(RESP.NOBOXCONN.ordinal());
+								continue;
+							}
+
+							os.writeByte(RESP.REQDATA.ordinal());
+							
+							String correspondent = is.readUTF();
+							
+							if(!po.mailboxExists(correspondent)){
+								
+								os.writeByte(RESP.NONEXISTBOX.ordinal());
+								continue;
+							}
+							
+							// Disallow looping live streams.
+							if(correspondent.equals(mb.getOwner())){
+							
+								os.writeByte(RESP.UNSUPPORTED.ordinal());
+								continue;
+							}
+								
+							try {
+								
+								po.createLiveStream(mb.getOwner(), correspondent);
+								
+							} catch (NonExistentMailboxException e) {
+								
+								os.writeByte(RESP.DELFAIL.ordinal());
+								continue;
+							}
+							
+							break;
+							
 						default:
 							
 							log(Level.DEBUG, "Received non-initiating command '" + request.name() + "'.");

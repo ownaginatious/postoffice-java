@@ -4,7 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import postoffice.connection.PostOfficeConnection;
+import postoffice.client.PostOfficeClient;
 import postoffice.exception.comm.DeliveryFailureException;
 import postoffice.exception.mailbox.ExistentMailboxException;
 import postoffice.exception.mailbox.ExistingMailboxConnectionException;
@@ -20,7 +20,7 @@ public class TestClient {
 	
 	public static void main(String[] args) throws IOException {
 		
-		PostOfficeConnection<StringMessage> poc = new PostOfficeConnection<StringMessage>(StringMessage.class);
+		PostOfficeClient<StringMessage> poc = new PostOfficeClient<StringMessage>(StringMessage.class);
 
 		String mailbox = null, box = null, password = null;
 		

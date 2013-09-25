@@ -5,6 +5,7 @@ import java.net.ServerSocket;
 import java.net.SocketException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,12 +21,15 @@ import postoffice.exception.mailbox.UnauthorizedActionException;
 
 public class PostOffice implements Runnable {
 
+	//FIXME: Add a suffix to identify this specific postoffice instance.
+	
 	public static final String OFFICE_ADDRESS = "postoffice.daemon";
 	public static final int DEFAULT_PORT = 8228;
 
 	private static Logger logger = Logger.getLogger(PostOffice.class);
 
 	private Map<String, Mailbox> mailboxes = new ConcurrentHashMap<String, Mailbox>();
+	private Map<UUID, ServerRoutedLiveStreamHandler> managedLiveStreams = new ConcurrentHashMap<UUID, ServerRoutedLiveStreamHandler>();
 
 	private boolean running = true;
 	
@@ -173,6 +177,17 @@ public class PostOffice implements Runnable {
 			recBox.deliver(letter);
 	}
 
+	protected void createLiveStream(String requester, String correspondent) throws NonExistentMailboxException {
+		
+		ServerRoutedLiveStreamHandler ls = new ServerRoutedLiveStreamHandler(requester, correspondent, this);
+		
+		// The requester always has to exist, so we should not bother checking for it.
+		if(!mailboxes.containsKey(correspondent))
+			throw new NonExistentMailboxException("The correspondent '" + correspondent + "' does not exist.");
+		
+		managedLiveStreams.put(ls.getIdentifier(), ls);
+	}
+	
 	/**
 	 * Shuts down the post office network and disconnects all clients.
 	 * 
@@ -189,8 +204,7 @@ public class PostOffice implements Runnable {
 			e.printStackTrace();
 		}
 	}
-
-
+	
 	@Override
 	public void run() {
 

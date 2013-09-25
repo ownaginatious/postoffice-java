@@ -32,12 +32,8 @@ public class CommFlags {
 		DELFAIL,
 		SHUTDOWN,
 		COMMTIMEOUT,
-		INMAIL
-	}
-	
-	public static enum LIVESTREAM {
-		
-		TCP
+		INMAIL,
+		UNSUPPORTED
 	}
 	
 	public static final int END_OF_LINE = 0xA;
