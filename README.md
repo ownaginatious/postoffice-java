@@ -1,6 +1,5 @@
 PostOffice
 ========
-----------
 
 Introduction
 ---------------
@@ -33,18 +32,18 @@ The following control flag enumerations are used for communication between the c
 
 Requests are sent from clients to the server. The table below lists their code names, code numbers and descriptions.
 
->| Code Name             | Code                       | Description              |
-> ----------------- | ----------------------------: | ------------------
->| `REQBOX`            | 0                                | Checkout an existing mailbox. |
->| `RETBOX`            | 1                                | Return an existing mailbox. |
->| `CREATEBOX`      | 2                                | Create a new mailbox. |
->| `REMOVEBOX`      | 3                                | Delete/destroy an existing mailbox. |
->| `SENDLETTER`    | 4                                | Send a letter to a mailbox. |
->| `GETMAIL`          | 5                                | Retrieve mail from the connected mailbox. |
->| `NEXTLETTER*`  | 6                               | Request the next letter in the connected mailbox. |
->| `SATIATED*`      | 7                               | Request for no further message transfers from the connected mailbox. |
->| `EMPTYBOX`        | 8                               | Delete all messages in the connected mailbox. |
->| `DISCONNECT`    | 9                               | Indicate that the client is going to disconnect from the *PostOffice* server (impeding socket closure). |
+| Code Name             | Code                       | Description             |
+| ----------------- | ----------------------------: | ------------------
+| `REQBOX`            | 0                                | Checkout an existing mailbox. |
+| `RETBOX`            | 1                                | Return an existing mailbox. |
+| `CREATEBOX`      | 2                                | Create a new mailbox. |
+| `REMOVEBOX`      | 3                                | Delete/destroy an existing mailbox. |
+| `SENDLETTER`    | 4                                | Send a letter to a mailbox. |
+| `GETMAIL`          | 5                                | Retrieve mail from the connected mailbox. |
+| `NEXTLETTER*`  | 6                               | Request the next letter in the connected mailbox. |
+| `SATIATED*`      | 7                               | Request for no further message transfers from the connected mailbox. |
+| `EMPTYBOX`        | 8                               | Delete all messages in the connected mailbox. |
+| `DISCONNECT`    | 9                               | Indicate that the client is going to disconnect from the *PostOffice* server (impeding socket closure). |
 
 Request flags marked by `*` are *non-initiating* flags, meaning they cannot be used as immediate requests to a server, and only as part of another request.
 
@@ -52,27 +51,27 @@ Request flags marked by `*` are *non-initiating* flags, meaning they cannot be u
 
 Responses are returned from the server to the client. The table below lists their code names, code numbers and descriptions.
 
->| Code Name             | Code                       | Description              |
-> ----------------- | ----------------------------: | ------------------
->| `REQGRANTED`    | 0                                | The clients request has been completed successfully. |
->| `REQDATA`            | 1                               | The client should now send some data. |
->| `NOAUTH`      | 2                                | Client has made a request it is not authorized to perform. |
->| `BADCOMMAND`      | 3                                | Client sent an unknown request code. |
->| `ALREADYCONN`    | 4                                | Client has requested to connect to a mailbox while already connected to one. |
->| `BOXEXISTS`  | 6                               | A box was requested to be created, but it already exists. |
->| `NONEXISTBOX`      | 7                               | A request has been made for a box that does not exist.|
->| `NOBOXCONN`        | 8                               | A request has been made on a mailbox, but no mailbox has been connected to yet. |
->| `BOXINUSE`    | 9                               | The requested mailbox has already been checked out. |
->| `DELFILE`    | 10                              | Failed to deliver a letter (the recipient does not exist). |
->| `SHUTDOWN`    | 11                               | Indicator that the server is shutting down and will be closing all sockets. |
->| `COMMTIMEOUT`    | 10                              | The clients response time has expired; server is going to disconnect. |
->| `NOMAIL`    | 10                              | There is no mail of the requested type in the mailbox. |
->| `INMAIL`    | 14                              | There is mail of the requested type in the mailbox. |
+| Code Name             | Code                       | Description              |
+ ----------------- | ----------------------------: | ------------------
+| `REQGRANTED`    | 0                                | The clients request has been completed successfully. |
+| `REQDATA`            | 1                               | The client should now send some data. |
+| `NOAUTH`      | 2                                | Client has made a request it is not authorized to perform. |
+| `BADCOMMAND`      | 3                                | Client sent an unknown request code. |
+| `ALREADYCONN`    | 4                                | Client has requested to connect to a mailbox while already connected to one. |
+| `BOXEXISTS`  | 6                               | A box was requested to be created, but it already exists. |
+| `NONEXISTBOX`      | 7                               | A request has been made for a box that does not exist.|
+| `NOBOXCONN`        | 8                               | A request has been made on a mailbox, but no mailbox has been connected to yet. |
+| `BOXINUSE`    | 9                               | The requested mailbox has already been checked out. |
+| `DELFILE`    | 10                              | Failed to deliver a letter (the recipient does not exist). |
+| `SHUTDOWN`    | 11                               | Indicator that the server is shutting down and will be closing all sockets. |
+| `COMMTIMEOUT`    | 10                              | The clients response time has expired; server is going to disconnect. |
+| `NOMAIL`    | 10                              | There is no mail of the requested type in the mailbox. |
+| `INMAIL`    | 14                              | There is mail of the requested type in the mailbox. |
 
 Data Restrictions
 --------------------
 
-**Identifiers**
+**1. Identifiers**
 
 Identifiers specified by clients must only be those recognizable by the regular expression `([a-zA-Z0-9]+\.)*[a-zA-Z0-9]+`
 
@@ -80,11 +79,11 @@ These include expressions of the form: `canada.government.primeminister`, `ameri
 
 All addresses must be communicated in the *UTF-8* encoding.
 
-**Passwords**
+**2. Passwords**
 
 All passwords must be 16-byte (128-bit) MD5-hashes. This is the only hashing type that the server supports.
 
-**Variable length data transmission**
+**3. Variable length data transmission**
 
 Some of the data transferred between the server and the client is ambiguous in length (i.e. mailbox identifiers, letters. etc). Two different schemes are used for handling this.
 
